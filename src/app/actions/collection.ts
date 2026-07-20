@@ -1,14 +1,25 @@
 'use server'
 
 import db from '@/db'
-import { collections } from '@/db/schema'
+import { collections, users } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 
 const mockUserId = 'user-1'
 
+// collections.userId is a FK to users; until real auth exists, make sure the
+// mock user row is present so inserts don't fail with a FK violation.
+async function ensureMockUser() {
+  await db
+    .insert(users)
+    .values({ id: mockUserId, email: 'treinador@local', name: 'Treinador' })
+    .onConflictDoNothing()
+}
+
 export async function togglePokemonInCollection(pokemonId: string, currentlyOwned: boolean) {
   try {
+    await ensureMockUser()
+
     if (currentlyOwned) {
       await db.delete(collections).where(and(
         eq(collections.userId, mockUserId),

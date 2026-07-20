@@ -47,6 +47,7 @@ export default function ScannerPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<IdentifiedPokemon[] | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
+  const [actionError, setActionError] = useState<string | null>(null)
 
   // Step 2: card selection for a chosen Pokémon.
   const [selected, setSelected] = useState<IdentifiedPokemon | null>(null)
@@ -117,9 +118,11 @@ export default function ScannerPage() {
   }
 
   const quickAdd = (pokemonId: string) => {
+    setActionError(null)
     startTransition(async () => {
       const r = await togglePokemonInCollection(pokemonId, false)
       if (r.success) setAdded((prev) => new Set(prev).add(pokemonId))
+      else setActionError(r.error ?? 'Não foi possível adicionar à coleção.')
     })
   }
 
@@ -127,11 +130,14 @@ export default function ScannerPage() {
   // card id is kept for the confirmation highlight.
   const pickCard = (card: CardOption) => {
     if (!selected) return
+    setActionError(null)
     startTransition(async () => {
       const r = await togglePokemonInCollection(selected.id, false)
       if (r.success) {
         setAdded((prev) => new Set(prev).add(selected.id))
         setChosenCardId(card.id)
+      } else {
+        setActionError(r.error ?? 'Não foi possível adicionar à coleção.')
       }
     })
   }
@@ -153,6 +159,12 @@ export default function ScannerPage() {
       <AppHeader title="Scanner de Cartas" />
 
       <div className="p-4 max-w-md mx-auto pb-24">
+        {actionError && (
+          <div className="mb-4 flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 rounded-xl p-3 text-sm font-medium">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+            {actionError}
+          </div>
+        )}
         {selected ? (
           <CardPicker
             pokemon={selected}
