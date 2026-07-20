@@ -63,6 +63,22 @@ export interface Match<T extends Named> {
   score: number
 }
 
+/** Every item scored against the best-matching candidate, highest score first. */
+export function rankMatches<T extends Named>(
+  candidates: string[],
+  items: T[],
+): Match<T>[] {
+  const scored: Match<T>[] = items.map((item) => {
+    let score = 0
+    for (const candidate of candidates) {
+      const s = nameScore(candidate, item.name)
+      if (s > score) score = s
+    }
+    return { item, score }
+  })
+  return scored.sort((a, b) => b.score - a.score)
+}
+
 /**
  * Best canonical item across every OCR candidate. Returns null when the top
  * score is below `threshold`, so callers can fall back to manual search rather
@@ -73,16 +89,6 @@ export function bestMatch<T extends Named>(
   items: T[],
   threshold = 0.55,
 ): Match<T> | null {
-  let best: Match<T> | null = null
-
-  for (const item of items) {
-    let score = 0
-    for (const candidate of candidates) {
-      const s = nameScore(candidate, item.name)
-      if (s > score) score = s
-    }
-    if (!best || score > best.score) best = { item, score }
-  }
-
-  return best && best.score >= threshold ? best : null
+  const [top] = rankMatches(candidates, items)
+  return top && top.score >= threshold ? top : null
 }

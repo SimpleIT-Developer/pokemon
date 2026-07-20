@@ -3,7 +3,7 @@
 import db from '@/db'
 import { pokemons } from '@/db/schema'
 import { asc, eq, or, ilike } from 'drizzle-orm'
-import { bestMatch, normalizeName } from '@/lib/similarity'
+import { rankMatches, normalizeName } from '@/lib/similarity'
 
 export interface IdentifiedPokemon {
   id: string
@@ -21,11 +21,18 @@ export interface IdentifiedCard {
 }
 
 export interface IdentifyResult {
-  status: 'identified' | 'not_found'
+  // identified: confident match. uncertain: weak match, ask the user to confirm.
+  // not_found: nothing legible to match against.
+  status: 'identified' | 'uncertain' | 'not_found'
   pokemon?: IdentifiedPokemon
   score?: number
   card?: IdentifiedCard | null
+  /** Nearest guesses for the user to pick from when unsure. */
+  suggestions: IdentifiedPokemon[]
 }
+
+const IDENTIFY_THRESHOLD = 0.7 // confident
+const SUGGEST_THRESHOLD = 0.4 // worth offering as a guess
 
 const TCG_ENDPOINT = 'https://api.pokemontcg.io/v2/cards'
 
@@ -83,7 +90,7 @@ export async function identifyCard(input: {
   const candidates = (input.candidates ?? []).filter(
     (c) => typeof c === 'string' && c.trim().length >= 3,
   )
-  if (candidates.length === 0) return { status: 'not_found' }
+  if (candidates.length === 0) return { status: 'not_found', suggestions: [] }
 
   const all = await db
     .select({
@@ -94,16 +101,27 @@ export async function identifyCard(input: {
     })
     .from(pokemons)
 
-  const match = bestMatch(candidates, all)
-  if (!match) return { status: 'not_found' }
+  const ranked = rankMatches(candidates, all)
+  const top = ranked[0]
+  const suggestions = ranked
+    .filter((m) => m.score >= SUGGEST_THRESHOLD)
+    .slice(0, 5)
+    .map((m) => m.item)
 
-  const card = await fetchCard(match.item.pokedexNumber, input.collectorNumber)
+  if (!top || top.score < SUGGEST_THRESHOLD) {
+    return { status: 'not_found', suggestions: [] }
+  }
+
+  // Only spend an API call once we have a plausible match.
+  const card = await fetchCard(top.item.pokedexNumber, input.collectorNumber)
+  const score = Number(top.score.toFixed(2))
 
   return {
-    status: 'identified',
-    pokemon: match.item,
-    score: Number(match.score.toFixed(2)),
+    status: top.score >= IDENTIFY_THRESHOLD ? 'identified' : 'uncertain',
+    pokemon: top.item,
+    score,
     card,
+    suggestions,
   }
 }
 

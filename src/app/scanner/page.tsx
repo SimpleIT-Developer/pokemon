@@ -2,7 +2,7 @@
 
 import { useState, useRef, useTransition } from 'react'
 import AppHeader from '@/components/AppHeader'
-import { Camera, Upload, RefreshCcw, Search, Check, Plus, Loader2, Eye } from 'lucide-react'
+import { Camera, Upload, RefreshCcw, Search, Check, Plus, Loader2, Eye, ChevronDown, AlertTriangle } from 'lucide-react'
 import { scanPokemonCard } from '@/services/card-scanner'
 import {
   identifyCard,
@@ -17,10 +17,18 @@ import clsx from 'clsx'
 
 type Phase = 'idle' | 'ocr' | 'identifying' | 'done'
 
+interface Debug {
+  rawText: string
+  candidates: string[]
+  confidence: number
+}
+
 export default function ScannerPage() {
   const [image, setImage] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [result, setResult] = useState<IdentifyResult | null>(null)
+  const [debug, setDebug] = useState<Debug | null>(null)
+  const [scanError, setScanError] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<IdentifiedPokemon[] | null>(null)
   const [added, setAdded] = useState<Set<string>>(new Set())
@@ -33,6 +41,8 @@ export default function ScannerPage() {
     setImage(null)
     setPhase('idle')
     setResult(null)
+    setDebug(null)
+    setScanError(false)
     setSearchQuery('')
     setSearchResults(null)
   }
@@ -43,15 +53,18 @@ export default function ScannerPage() {
     const url = URL.createObjectURL(file)
     setImage(url)
     setResult(null)
+    setDebug(null)
+    setScanError(false)
     setSearchResults(null)
     processImage(url)
-    e.target.value = '' // allow re-picking the same file
+    e.target.value = ''
   }
 
   const processImage = async (url: string) => {
     try {
       setPhase('ocr')
       const ocr = await scanPokemonCard(url)
+      setDebug({ rawText: ocr.rawText, candidates: ocr.candidates, confidence: ocr.confidence })
 
       setPhase('identifying')
       const res = await identifyCard({
@@ -61,7 +74,7 @@ export default function ScannerPage() {
       setResult(res)
     } catch (error) {
       console.error('Scan failed', error)
-      setResult({ status: 'not_found' })
+      setScanError(true)
     } finally {
       setPhase('done')
     }
@@ -84,6 +97,7 @@ export default function ScannerPage() {
   }
 
   const busy = phase === 'ocr' || phase === 'identifying'
+  const identified = result?.status === 'identified' || result?.status === 'uncertain'
 
   return (
     <>
@@ -95,7 +109,6 @@ export default function ScannerPage() {
         ) : (
           <div className="flex flex-col items-center">
             <div className="relative w-full aspect-[3/4] max-w-[300px] rounded-2xl overflow-hidden shadow-xl mb-6">
-              {/* Preview is a blob/data URL, so a plain img is appropriate here. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={image} alt="Carta escaneada" className="w-full h-full object-cover" />
               {busy && (
@@ -108,30 +121,57 @@ export default function ScannerPage() {
               )}
             </div>
 
-            {phase === 'done' && result?.status === 'identified' && result.pokemon && (
-              <IdentifiedView
-                result={result}
-                added={added.has(result.pokemon.id)}
-                isPending={isPending}
-                onAdd={() => addToCollection(result.pokemon!.id)}
-                onView={() => router.push(`/pokemon/${result.pokemon!.id}`)}
-                onRetry={reset}
-              />
-            )}
+            {phase === 'done' && (
+              <div className="w-full flex flex-col gap-4">
+                {scanError && <ScanErrorCard onRetry={reset} />}
 
-            {phase === 'done' && result?.status === 'not_found' && (
-              <NotFoundView
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                onSearch={handleSearch}
-                isSearching={isSearching}
-                results={searchResults}
-                added={added}
-                isPending={isPending}
-                onAdd={addToCollection}
-                onView={(id) => router.push(`/pokemon/${id}`)}
-                onRetry={reset}
-              />
+                {identified && result?.pokemon && (
+                  <IdentifiedView
+                    result={result}
+                    added={added}
+                    isPending={isPending}
+                    onAdd={addToCollection}
+                    onView={(id) => router.push(`/pokemon/${id}`)}
+                  />
+                )}
+
+                {result?.status === 'not_found' && (
+                  <NotFoundHeader hasSuggestions={(result.suggestions?.length ?? 0) > 0} />
+                )}
+
+                {/* Suggestions (uncertain or not_found) */}
+                {result && result.status !== 'identified' && result.suggestions?.length > 0 && (
+                  <SuggestionList
+                    title="É algum destes?"
+                    items={result.suggestions}
+                    added={added}
+                    isPending={isPending}
+                    onAdd={addToCollection}
+                    onView={(id) => router.push(`/pokemon/${id}`)}
+                  />
+                )}
+
+                {/* Manual search always available when not confidently identified */}
+                {(scanError || (result && result.status !== 'identified')) && (
+                  <ManualSearch
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    onSearch={handleSearch}
+                    isSearching={isSearching}
+                    results={searchResults}
+                    added={added}
+                    isPending={isPending}
+                    onAdd={addToCollection}
+                    onView={(id) => router.push(`/pokemon/${id}`)}
+                  />
+                )}
+
+                {debug && <DebugBox debug={debug} />}
+
+                <button onClick={reset} className="py-2 text-sm text-gray-500 font-medium">
+                  Escanear outra carta
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -155,7 +195,7 @@ function CaptureArea({ onPick }: { onPick: () => void }) {
       <div className="absolute inset-8 border-2 border-poke-blue/30 rounded-xl pointer-events-none" />
       <Camera className="w-16 h-16 text-gray-400 mb-4" />
       <p className="text-gray-500 font-medium text-center px-8 mb-6">
-        Posicione o card dentro da área, com boa iluminação e o nome bem visível.
+        Enquadre só a carta, com boa luz e o nome no topo bem legível.
       </p>
       <div className="flex gap-4">
         <button
@@ -177,29 +217,61 @@ function CaptureArea({ onPick }: { onPick: () => void }) {
   )
 }
 
+function ScanErrorCard({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="w-full bg-white dark:bg-poke-dark border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm text-center">
+      <AlertTriangle className="w-10 h-10 text-poke-red mx-auto mb-3" />
+      <h3 className="font-bold text-lg mb-1">Falha ao ler a imagem</h3>
+      <p className="text-sm text-gray-500 mb-4">
+        Não foi possível processar a foto. Tente novamente ou busque manualmente abaixo.
+      </p>
+      <button onClick={onRetry} className="text-sm text-poke-red font-bold">
+        Tentar outra foto
+      </button>
+    </div>
+  )
+}
+
+function NotFoundHeader({ hasSuggestions }: { hasSuggestions: boolean }) {
+  return (
+    <div className="w-full bg-white dark:bg-poke-dark border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm text-center">
+      <h3 className="text-red-500 font-bold text-lg mb-1">Não identificado</h3>
+      <p className="text-sm text-gray-500">
+        {hasSuggestions
+          ? 'Não temos certeza. Veja os palpites ou busque manualmente.'
+          : 'Não reconhecemos o Pokémon. Busque pelo nome ou número.'}
+      </p>
+    </div>
+  )
+}
+
 function IdentifiedView({
   result,
   added,
   isPending,
   onAdd,
   onView,
-  onRetry,
 }: {
   result: IdentifyResult
-  added: boolean
+  added: Set<string>
   isPending: boolean
-  onAdd: () => void
-  onView: () => void
-  onRetry: () => void
+  onAdd: (id: string) => void
+  onView: (id: string) => void
 }) {
   const p = result.pokemon!
   const card = result.card
-  const uncertain = (result.score ?? 0) < 0.7
+  const uncertain = result.status === 'uncertain'
+  const isAdded = added.has(p.id)
 
   return (
     <div className="w-full bg-white dark:bg-poke-dark border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
-      <h3 className="text-green-500 font-bold text-lg mb-4 text-center">
-        Pokémon Identificado!
+      <h3
+        className={clsx(
+          'font-bold text-lg mb-4 text-center',
+          uncertain ? 'text-amber-500' : 'text-green-500',
+        )}
+      >
+        {uncertain ? 'Provavelmente é...' : 'Pokémon Identificado!'}
       </h3>
 
       <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800 rounded-xl p-4 mb-4">
@@ -228,32 +300,22 @@ function IdentifiedView({
         </div>
         {card?.image && (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={card.image}
-            alt={card.name}
-            className="w-14 rounded-md shadow ml-auto flex-shrink-0"
-          />
+          <img src={card.image} alt={card.name} className="w-14 rounded-md shadow ml-auto flex-shrink-0" />
         )}
       </div>
 
-      {uncertain && (
-        <p className="text-center text-xs text-amber-500 font-medium mb-4">
-          Identificação com baixa confiança. Confira se é este o Pokémon.
-        </p>
-      )}
-
       <div className="flex flex-col gap-2">
         <button
-          onClick={onAdd}
-          disabled={isPending || added}
+          onClick={() => onAdd(p.id)}
+          disabled={isPending || isAdded}
           className={clsx(
             'flex items-center justify-center gap-2 py-3 rounded-full font-bold text-white shadow-md transition-all active:scale-95',
-            added ? 'bg-green-500' : 'bg-poke-red hover:bg-poke-red-dark',
+            isAdded ? 'bg-green-500' : 'bg-poke-red hover:bg-poke-red-dark',
           )}
         >
-          {isPending ? (
+          {isPending && !isAdded ? (
             <Loader2 className="w-5 h-5 animate-spin" />
-          ) : added ? (
+          ) : isAdded ? (
             <>
               <Check className="w-5 h-5" /> Adicionado à coleção
             </>
@@ -264,23 +326,84 @@ function IdentifiedView({
           )}
         </button>
         <button
-          onClick={onView}
+          onClick={() => onView(p.id)}
           className="flex items-center justify-center gap-2 bg-white dark:bg-poke-dark border border-gray-200 dark:border-gray-700 py-3 rounded-full font-bold"
         >
           <Eye className="w-5 h-5" /> Ver Pokémon
-        </button>
-        <button
-          onClick={onRetry}
-          className="py-2 text-sm text-gray-500 font-medium"
-        >
-          Escanear outra carta
         </button>
       </div>
     </div>
   )
 }
 
-function NotFoundView({
+function SuggestionList({
+  title,
+  items,
+  added,
+  isPending,
+  onAdd,
+  onView,
+}: {
+  title: string
+  items: IdentifiedPokemon[]
+  added: Set<string>
+  isPending: boolean
+  onAdd: (id: string) => void
+  onView: (id: string) => void
+}) {
+  return (
+    <div className="w-full bg-white dark:bg-poke-dark border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
+      <p className="text-sm font-bold text-gray-500 mb-3 px-1">{title}</p>
+      <div className="flex flex-col gap-2">
+        {items.map((p) => (
+          <PokemonRow
+            key={p.id}
+            p={p}
+            added={added.has(p.id)}
+            isPending={isPending}
+            onAdd={() => onAdd(p.id)}
+            onView={() => onView(p.id)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PokemonRow({
+  p,
+  added,
+  isPending,
+  onAdd,
+  onView,
+}: {
+  p: IdentifiedPokemon
+  added: boolean
+  isPending: boolean
+  onAdd: () => void
+  onView: () => void
+}) {
+  return (
+    <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-xl p-2">
+      {p.imageUrl && (
+        <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="w-10 h-10 object-contain" />
+      )}
+      <button onClick={onView} className="flex-1 text-left min-w-0">
+        <div className="text-xs font-mono text-gray-500">#{String(p.pokedexNumber).padStart(4, '0')}</div>
+        <div className="font-bold uppercase truncate">{p.name}</div>
+      </button>
+      <button
+        onClick={onAdd}
+        disabled={isPending || added}
+        className={clsx('p-2 rounded-full text-white flex-shrink-0', added ? 'bg-green-500' : 'bg-poke-red')}
+      >
+        {added ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+      </button>
+    </div>
+  )
+}
+
+function ManualSearch({
   searchQuery,
   setSearchQuery,
   onSearch,
@@ -290,7 +413,6 @@ function NotFoundView({
   isPending,
   onAdd,
   onView,
-  onRetry,
 }: {
   searchQuery: string
   setSearchQuery: (v: string) => void
@@ -301,21 +423,15 @@ function NotFoundView({
   isPending: boolean
   onAdd: (id: string) => void
   onView: (id: string) => void
-  onRetry: () => void
 }) {
   return (
-    <div className="w-full bg-white dark:bg-poke-dark border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
-      <h3 className="text-red-500 font-bold text-lg mb-2 text-center">Não identificado</h3>
-      <p className="text-center text-sm text-gray-500 mb-4">
-        Não reconhecemos o Pokémon automaticamente. Busque pelo nome ou número.
-      </p>
-
-      <form onSubmit={onSearch} className="flex gap-2 mb-4">
+    <div className="w-full bg-white dark:bg-poke-dark border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
+      <form onSubmit={onSearch} className="flex gap-2">
         <div className="relative flex-1">
           <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Nome ou número..."
+            placeholder="Buscar por nome ou número..."
             className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-poke-red"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -327,46 +443,55 @@ function NotFoundView({
       </form>
 
       {results && results.length === 0 && (
-        <p className="text-center text-sm text-gray-400 mb-4">Nenhum resultado.</p>
+        <p className="text-center text-sm text-gray-400 mt-3">Nenhum resultado.</p>
       )}
 
       {results && results.length > 0 && (
-        <div className="flex flex-col gap-2 mb-4">
+        <div className="flex flex-col gap-2 mt-3">
           {results.map((p) => (
-            <div
+            <PokemonRow
               key={p.id}
-              className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-xl p-2"
-            >
-              {p.imageUrl && (
-                <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="w-10 h-10 object-contain" />
-              )}
-              <button onClick={() => onView(p.id)} className="flex-1 text-left min-w-0">
-                <div className="text-xs font-mono text-gray-500">
-                  #{String(p.pokedexNumber).padStart(4, '0')}
-                </div>
-                <div className="font-bold uppercase truncate">{p.name}</div>
-              </button>
-              <button
-                onClick={() => onAdd(p.id)}
-                disabled={isPending || added.has(p.id)}
-                className={clsx(
-                  'p-2 rounded-full text-white flex-shrink-0',
-                  added.has(p.id) ? 'bg-green-500' : 'bg-poke-red',
-                )}
-              >
-                {added.has(p.id) ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-              </button>
-            </div>
+              p={p}
+              added={added.has(p.id)}
+              isPending={isPending}
+              onAdd={() => onAdd(p.id)}
+              onView={() => onView(p.id)}
+            />
           ))}
         </div>
       )}
+    </div>
+  )
+}
 
+function DebugBox({ debug }: { debug: Debug }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="w-full">
       <button
-        onClick={onRetry}
-        className="w-full bg-white dark:bg-poke-dark border border-gray-200 dark:border-gray-700 py-3 rounded-full font-bold"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-xs text-gray-400 font-medium mx-auto"
       >
-        Tentar outra foto
+        <ChevronDown className={clsx('w-4 h-4 transition-transform', open && 'rotate-180')} />
+        O que o scanner leu
       </button>
+      {open && (
+        <div className="mt-2 bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-xs text-gray-500 space-y-2">
+          <div>
+            <span className="font-bold">Confiança OCR:</span> {Math.round(debug.confidence)}%
+          </div>
+          <div>
+            <span className="font-bold">Candidatos:</span>{' '}
+            {debug.candidates.length ? debug.candidates.join(', ') : '(nenhum)'}
+          </div>
+          <div>
+            <span className="font-bold">Texto lido:</span>
+            <pre className="whitespace-pre-wrap break-words mt-1 font-mono">
+              {debug.rawText || '(vazio)'}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
