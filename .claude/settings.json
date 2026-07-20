@@ -31,7 +31,20 @@
       "Bash(curl -s --max-time 60 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3996/)",
       "Bash(curl -s --max-time 60 http://localhost:3996/)",
       "Bash(taskkill //IM node.exe //F)",
-      "Bash(rm -rf .open-next)"
+      "Bash(rm -rf .open-next)",
+      "WebFetch(domain:docs.pokemontcg.io)",
+      "Bash(curl -s --max-time 30 \"https://api.pokemontcg.io/v2/cards?q=name:charizard%20number:4&pageSize=1\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" --max-time 30 \"https://api.pokemontcg.io/v2/cards?pageSize=1\")",
+      "Bash(node -e \"const t=require\\('./package.json'\\);console.log\\('tesseract', \\(t.dependencies['tesseract.js']\\)\\)\")",
+      "Bash(curl -s --max-time 30 \"https://api.pokemontcg.io/v2/cards?q=name:charizrd&pageSize=1&select=id,name\")",
+      "Bash(curl -s --max-time 30 \"https://api.pokemontcg.io/v2/cards?q=nationalPokedexNumbers:6&pageSize=2&select=id,name,number,set,images,rarity,nationalPokedexNumbers\")",
+      "Bash(curl -s --max-time 30 \"https://api.pokemontcg.io/v2/cards?q=nationalPokedexNumbers:6%20number:4&pageSize=2&select=id,name,number,set,rarity\")",
+      "Bash(node -e \"const s='.replace\\(/[̀-ͯ]/g'; console.log\\('ok'\\)\")",
+      "Bash(node --input-type=module -e \"import\\('./src/lib/similarity.ts'\\).catch\\(\\(\\)=>{}\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(cp \"C:/Users/MATHEU~1/AppData/Local/Temp/claude/d--Pokemon/4dafa001-db8d-409f-be16-50e77a486336/scratchpad/t.ts\" src/lib/_smoke.ts)",
+      "Bash(sed -i \"s|'../../../../../../../../d/Pokemon/src/lib/similarity'|'./similarity'|\" src/lib/_smoke.ts)",
+      "Bash(rm src/lib/_smoke.ts)"
     ]
   }
 }
