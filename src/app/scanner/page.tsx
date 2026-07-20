@@ -185,6 +185,7 @@ export default function ScannerPage() {
             owned={added.has(selected.id)}
             onPickCard={pickCard}
             onAddWithoutCard={() => quickAdd(selected.id)}
+            onRetry={() => pickPokemon(selected)}
             onView={() => router.push(`/pokemon/${selected.id}`)}
             onBack={() => {
               setSelected(null)
@@ -462,6 +463,7 @@ function CardPicker({
   owned,
   onPickCard,
   onAddWithoutCard,
+  onRetry,
   onView,
   onBack,
 }: {
@@ -473,6 +475,7 @@ function CardPicker({
   owned: boolean
   onPickCard: (card: CardOption) => void
   onAddWithoutCard: () => void
+  onRetry: () => void
   onView: () => void
   onBack: () => void
 }) {
@@ -543,9 +546,17 @@ function CardPicker({
           ))}
         </div>
       ) : (
-        <p className="text-center text-sm text-gray-400 py-4">
-          Nenhuma carta encontrada na base para este Pokémon.
-        </p>
+        <div className="text-center py-4">
+          <p className="text-sm text-gray-400 mb-3">
+            Nenhuma carta veio da base. Pode ser lentidão momentânea da API.
+          </p>
+          <button
+            onClick={onRetry}
+            className="inline-flex items-center gap-2 text-sm text-poke-red font-bold"
+          >
+            <RefreshCcw className="w-4 h-4" /> Tentar novamente
+          </button>
+        </div>
       )}
 
       <div className="flex flex-col gap-2 mt-2">

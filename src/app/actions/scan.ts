@@ -49,6 +49,22 @@ const SUGGEST_THRESHOLD = 0.4 // worth offering as a guess
 
 const TCG_ENDPOINT = 'https://api.pokemontcg.io/v2/cards'
 
+// Manual timeout via AbortController — portable across runtimes, unlike
+// AbortSignal.timeout() whose support in the Workers runtime is uncertain.
+async function fetchWithTimeout(
+  url: string,
+  opts: RequestInit = {},
+  ms = 12000,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function fetchCard(
   pokedexNumber: number,
   collectorNumber: string | null,
@@ -67,10 +83,7 @@ async function fetchCard(
   for (const q of queries) {
     try {
       const url = `${TCG_ENDPOINT}?q=${encodeURIComponent(q)}&pageSize=1&select=${select}`
-      const res = await fetch(url, {
-        headers,
-        signal: AbortSignal.timeout(6000),
-      })
+      const res = await fetchWithTimeout(url, { headers }, 8000)
       if (!res.ok) continue
 
       const json = (await res.json()) as { data?: any[] }
@@ -108,7 +121,7 @@ export async function getCardsForPokemon(pokedexNumber: number): Promise<CardOpt
   const url = `${TCG_ENDPOINT}?q=${encodeURIComponent(q)}&pageSize=60&select=${select}`
 
   try {
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(12000) })
+    const res = await fetchWithTimeout(url, { headers }, 12000)
     if (!res.ok) return []
     const json = (await res.json()) as { data?: any[] }
     const cards: CardOption[] = (json.data ?? []).map((card) => ({
@@ -244,15 +257,13 @@ export async function findByNumber(n: number): Promise<IdentifiedPokemon | null>
 
 async function fetchSpeciesFromPokeApi(n: number) {
   try {
-    const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${n}`, {
-      signal: AbortSignal.timeout(8000),
-    })
+    const res = await fetchWithTimeout(`https://pokeapi.co/api/v2/pokemon/${n}`, {}, 8000)
     if (!res.ok) return null
     const data = (await res.json()) as any
 
     let generation = 1
     try {
-      const speciesRes = await fetch(data.species.url, { signal: AbortSignal.timeout(8000) })
+      const speciesRes = await fetchWithTimeout(data.species.url, {}, 8000)
       if (speciesRes.ok) {
         const species = (await speciesRes.json()) as any
         const parsed = parseInt(String(species.generation?.url ?? '').split('/').filter(Boolean).pop() ?? '1', 10)
