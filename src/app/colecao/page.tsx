@@ -4,8 +4,6 @@ import db from '@/db'
 import { collections, pokemons } from '@/db/schema'
 import { eq, and, asc } from 'drizzle-orm'
 
-export const runtime = 'edge'
-
 export default async function ColecaoPage() {
   const mockUserId = 'user-1'
   let collectionsList: any[] = []

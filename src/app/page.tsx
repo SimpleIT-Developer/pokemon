@@ -5,8 +5,6 @@ import db from '@/db'
 import { collections, pokemons } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
 
-export const runtime = 'edge'
-
 const GENERATIONS = [
   { gen: 1, start: 1, end: 151 },
   { gen: 2, start: 152, end: 251 },
