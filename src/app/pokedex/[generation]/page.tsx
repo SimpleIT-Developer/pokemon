@@ -5,6 +5,8 @@ import { collections, pokemons } from '@/db/schema'
 import { eq, and, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 
+export const runtime = 'edge'
+
 export default async function GenerationPage(props: { params: Promise<{ generation: string }> }) {
   const params = await props.params;
   const gen = parseInt(params.generation)

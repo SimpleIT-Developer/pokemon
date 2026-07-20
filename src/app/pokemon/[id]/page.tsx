@@ -6,6 +6,8 @@ import db from '@/db'
 import { collections, pokemons } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
 
+export const runtime = 'edge'
+
 export default async function PokemonPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const mockUserId = 'user-1'

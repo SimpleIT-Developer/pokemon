@@ -5,6 +5,8 @@ import { collections } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 
+export const runtime = 'edge'
+
 const mockUserId = 'user-1'
 
 export async function togglePokemonInCollection(pokemonId: string, currentlyOwned: boolean) {
