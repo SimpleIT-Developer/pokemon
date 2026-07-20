@@ -99,12 +99,20 @@ export default function ScannerPage() {
         collectorNumber: ocr.collectorNumber,
       })
       setResult(res)
+      mergeOwned([res.pokemon, ...(res.suggestions ?? [])])
     } catch (error) {
       console.error('Scan failed', error)
       setScanError(true)
     } finally {
       setPhase('done')
     }
+  }
+
+  // Reflect already-owned Pokémon (from the DB) in the same set used for the
+  // just-added ones, so the UI shows "Na coleção" for both.
+  const mergeOwned = (list: (IdentifiedPokemon | undefined)[]) => {
+    const ids = list.filter((p): p is IdentifiedPokemon => !!p && p.owned).map((p) => p.id)
+    if (ids.length) setAdded((prev) => new Set([...prev, ...ids]))
   }
 
   // Step 1 → 2: user picked a Pokémon; load its cards from the API.
@@ -147,7 +155,9 @@ export default function ScannerPage() {
     const q = searchQuery.trim()
     if (!q) return
     startSearch(async () => {
-      setSearchResults(await searchPokemon(q))
+      const r = await searchPokemon(q)
+      setSearchResults(r)
+      mergeOwned(r)
     })
   }
 

@@ -1,15 +1,18 @@
 'use server'
 
 import db from '@/db'
-import { pokemons } from '@/db/schema'
-import { asc, eq, or, ilike } from 'drizzle-orm'
+import { pokemons, collections } from '@/db/schema'
+import { and, asc, eq, or, ilike, inArray } from 'drizzle-orm'
 import { rankMatches, normalizeName } from '@/lib/similarity'
+
+const mockUserId = 'user-1'
 
 export interface IdentifiedPokemon {
   id: string
   pokedexNumber: number
   name: string
   imageUrl: string | null
+  owned: boolean
 }
 
 export interface IdentifiedCard {
@@ -100,13 +103,15 @@ export async function getCardsForPokemon(pokedexNumber: number): Promise<CardOpt
   const headers: Record<string, string> = key ? { 'X-Api-Key': key } : {}
   const select = 'id,name,number,rarity,set,images'
   const q = `nationalPokedexNumbers:${pokedexNumber}`
-  const url = `${TCG_ENDPOINT}?q=${encodeURIComponent(q)}&pageSize=40&orderBy=-set.releaseDate&select=${select}`
+  // No server-side orderBy: sorting by set.releaseDate on the API is ~10x slower
+  // (30s+) and blows the timeout. Fetch unsorted, order newest-first in JS.
+  const url = `${TCG_ENDPOINT}?q=${encodeURIComponent(q)}&pageSize=60&select=${select}`
 
   try {
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) })
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(12000) })
     if (!res.ok) return []
     const json = (await res.json()) as { data?: any[] }
-    return (json.data ?? []).map((card) => ({
+    const cards: CardOption[] = (json.data ?? []).map((card) => ({
       id: card.id,
       name: card.name ?? '',
       setName: card.set?.name ?? '',
@@ -115,6 +120,10 @@ export async function getCardsForPokemon(pokedexNumber: number): Promise<CardOpt
       releaseDate: card.set?.releaseDate ?? null,
       image: card.images?.small ?? card.images?.large ?? null,
     }))
+
+    // releaseDate is "YYYY/MM/DD", so a string compare sorts chronologically.
+    cards.sort((a, b) => (b.releaseDate ?? '').localeCompare(a.releaseDate ?? ''))
+    return cards
   } catch {
     return []
   }
@@ -145,14 +154,17 @@ export async function identifyCard(input: {
 
   const ranked = rankMatches(candidates, all)
   const top = ranked[0]
-  const suggestions = ranked
-    .filter((m) => m.score >= SUGGEST_THRESHOLD)
-    .slice(0, 5)
-    .map((m) => m.item)
 
   if (!top || top.score < SUGGEST_THRESHOLD) {
     return { status: 'not_found', suggestions: [] }
   }
+
+  const suggestionRows = ranked
+    .filter((m) => m.score >= SUGGEST_THRESHOLD)
+    .slice(0, 5)
+    .map((m) => m.item)
+  const suggestions = await withOwnership(suggestionRows)
+  const pokemon = suggestions.find((s) => s.id === top.item.id) ?? { ...top.item, owned: false }
 
   // Only spend an API call once we have a plausible match.
   const card = await fetchCard(top.item.pokedexNumber, input.collectorNumber)
@@ -160,7 +172,7 @@ export async function identifyCard(input: {
 
   return {
     status: top.score >= IDENTIFY_THRESHOLD ? 'identified' : 'uncertain',
-    pokemon: top.item,
+    pokemon,
     score,
     card,
     suggestions,
@@ -173,6 +185,29 @@ const POKEMON_COLUMNS = {
   name: pokemons.name,
   imageUrl: pokemons.imageUrl,
 } as const
+
+type PokemonRow = { id: string; pokedexNumber: number; name: string; imageUrl: string | null }
+
+/** Which of these Pokémon the mock user already owns. */
+async function ownedSet(ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set()
+  const rows = await db
+    .select({ id: collections.pokemonId })
+    .from(collections)
+    .where(
+      and(
+        eq(collections.userId, mockUserId),
+        eq(collections.owned, true),
+        inArray(collections.pokemonId, ids),
+      ),
+    )
+  return new Set(rows.map((r) => r.id))
+}
+
+async function withOwnership(rows: PokemonRow[]): Promise<IdentifiedPokemon[]> {
+  const owned = await ownedSet(rows.map((r) => r.id))
+  return rows.map((r) => ({ ...r, owned: owned.has(r.id) }))
+}
 
 const MAX_POKEDEX = 1025
 
@@ -189,7 +224,7 @@ export async function findByNumber(n: number): Promise<IdentifiedPokemon | null>
     .from(pokemons)
     .where(eq(pokemons.pokedexNumber, n))
     .limit(1)
-  if (existing[0]) return existing[0]
+  if (existing[0]) return (await withOwnership(existing))[0]
 
   const data = await fetchSpeciesFromPokeApi(n)
   if (!data) return null
@@ -204,7 +239,7 @@ export async function findByNumber(n: number): Promise<IdentifiedPokemon | null>
     .from(pokemons)
     .where(eq(pokemons.pokedexNumber, n))
     .limit(1)
-  return created[0] ?? null
+  return created[0] ? (await withOwnership(created))[0] : null
 }
 
 async function fetchSpeciesFromPokeApi(n: number) {
@@ -265,7 +300,7 @@ export async function searchPokemon(query: string): Promise<IdentifiedPokemon[]>
     .orderBy(asc(pokemons.pokedexNumber))
     .limit(10)
 
-  if (rows.length > 0) return rows
+  if (rows.length > 0) return withOwnership(rows)
 
   // No substring hit — fall back to a fuzzy pass over the full list.
   const all = await db
@@ -278,9 +313,10 @@ export async function searchPokemon(query: string): Promise<IdentifiedPokemon[]>
     .from(pokemons)
 
   const qn = normalizeName(q)
-  return all
+  const matches = all
     .map((p) => ({ p, s: normalizeName(p.name).includes(qn) ? 1 : 0 }))
     .filter((x) => x.s > 0)
     .slice(0, 10)
     .map((x) => x.p)
+  return withOwnership(matches)
 }
