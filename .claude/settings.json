@@ -44,7 +44,11 @@
       "Bash(npx tsc *)",
       "Bash(cp \"C:/Users/MATHEU~1/AppData/Local/Temp/claude/d--Pokemon/4dafa001-db8d-409f-be16-50e77a486336/scratchpad/t.ts\" src/lib/_smoke.ts)",
       "Bash(sed -i \"s|'../../../../../../../../d/Pokemon/src/lib/similarity'|'./similarity'|\" src/lib/_smoke.ts)",
-      "Bash(rm src/lib/_smoke.ts)"
+      "Bash(rm src/lib/_smoke.ts)",
+      "Bash(curl -s --max-time 20 \"https://pokeapi.co/api/v2/pokemon/19\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\).on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('id',j.id\\);console.log\\('name',j.name\\);console.log\\('type0',j.types[0].type.name\\);console.log\\('art',j.sprites.other['official-artwork'].front_default\\);console.log\\('species',j.species.url\\)}\\)\")",
+      "Bash(curl -s --max-time 30 \"https://api.pokemontcg.io/v2/cards?q=nationalPokedexNumbers:25&pageSize=4&select=id,name,number,rarity,set,images&orderBy=-set.releaseDate\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\).on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('total',j.totalCount\\);for\\(const c of j.data\\)console.log\\('-',c.name,'|',c.set.name,'\\('+c.set.releaseDate+'\\) #'+c.number,'|',c.rarity,'|',c.images.small\\)}\\)\")"
     ]
   }
 }

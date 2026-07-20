@@ -1,3 +1,4 @@
+import 'dotenv/config' // load DATABASE_URL from .env before the db is used
 import { pokemons } from '../db/schema'
 import db from '../db'
 import { eq } from 'drizzle-orm'
