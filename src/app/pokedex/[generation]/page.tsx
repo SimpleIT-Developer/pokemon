@@ -14,28 +14,22 @@ export default async function GenerationPage(props: { params: Promise<{ generati
   }
 
   const mockUserId = 'user-1'
-  let pokemonsList: any[] = []
-  let ownedIds = new Set<string>()
 
-  try {
-    pokemonsList = await db.select()
-      .from(pokemons)
-      .where(eq(pokemons.generation, gen))
-      .orderBy(asc(pokemons.pokedexNumber))
-    
-    const userCollections = await db.select({ pokemonId: collections.pokemonId })
-      .from(collections)
-      .innerJoin(pokemons, eq(collections.pokemonId, pokemons.id))
-      .where(and(
-        eq(collections.userId, mockUserId),
-        eq(collections.owned, true),
-        eq(pokemons.generation, gen)
-      ))
-    
-    userCollections.forEach((c) => ownedIds.add(c.pokemonId))
-  } catch (error) {
-    console.error("Database connection failed", error)
-  }
+  const pokemonsList = await db.select()
+    .from(pokemons)
+    .where(eq(pokemons.generation, gen))
+    .orderBy(asc(pokemons.pokedexNumber))
+
+  const userCollections = await db.select({ pokemonId: collections.pokemonId })
+    .from(collections)
+    .innerJoin(pokemons, eq(collections.pokemonId, pokemons.id))
+    .where(and(
+      eq(collections.userId, mockUserId),
+      eq(collections.owned, true),
+      eq(pokemons.generation, gen)
+    ))
+
+  const ownedIds = new Set<string>(userCollections.map((c) => c.pokemonId))
 
   const foundCount = ownedIds.size
   const totalCount = pokemonsList.length

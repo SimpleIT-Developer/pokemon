@@ -9,30 +9,20 @@ import { eq, and } from 'drizzle-orm'
 export default async function PokemonPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const mockUserId = 'user-1'
-  let pokemon: any = null
-  let collection: any = null
-  
-  try {
-    const pResult = await db.select().from(pokemons).where(eq(pokemons.id, params.id)).limit(1)
-    if (pResult.length > 0) {
-      pokemon = pResult[0]
-      
-      const cResult = await db.select().from(collections).where(and(
-        eq(collections.userId, mockUserId),
-        eq(collections.pokemonId, pokemon.id)
-      )).limit(1)
-      
-      if (cResult.length > 0) {
-        collection = cResult[0]
-      }
-    }
-  } catch (error) {
-    console.error(error)
-  }
-  
+
+  const pResult = await db.select().from(pokemons).where(eq(pokemons.id, params.id)).limit(1)
+  const pokemon = pResult[0]
+
   if (!pokemon) {
     notFound()
   }
+
+  const cResult = await db.select().from(collections).where(and(
+    eq(collections.userId, mockUserId),
+    eq(collections.pokemonId, pokemon.id)
+  )).limit(1)
+
+  const collection = cResult[0] ?? null
 
   const isOwned = !!collection?.owned
   const quantity = collection?.quantity || 0

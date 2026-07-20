@@ -8,7 +8,30 @@
       "Bash(rm -rf node_modules)",
       "Bash(npm clean-install *)",
       "Bash(npx opennextjs-cloudflare *)",
-      "Bash(env -u DATABASE_URL npx opennextjs-cloudflare build)"
+      "Bash(env -u DATABASE_URL npx opennextjs-cloudflare build)",
+      "Bash(node \"C:/Users/MATHEU~1/AppData/Local/Temp/claude/d--Pokemon/4dafa001-db8d-409f-be16-50e77a486336/scratchpad/gen-icons.js\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3999/)",
+      "Bash(env -u DATABASE_URL npx next dev --port 3999)",
+      "Bash(curl -s -o /dev/null http://localhost:3999/)",
+      "Bash(curl -s http://localhost:3999/)",
+      "Bash(DATABASE_URL=\"postgresql://u:p@db-inexistente.invalid/neondb?sslmode=require\" npx next dev --port 3998)",
+      "Bash(curl -s -o /dev/null http://localhost:3998/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3998/)",
+      "Bash(curl -s http://localhost:3998/)",
+      "Bash(taskkill //PID 1520 //F)",
+      "Bash(curl -s -o /dev/null --max-time 60 http://localhost:3998/)",
+      "Bash(curl -s --max-time 60 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3998/)",
+      "Bash(curl -s --max-time 60 http://localhost:3998/)",
+      "Bash(DATABASE_URL=\"postgresql://u:p@db-inexistente.invalid/neondb?sslmode=require\" npx next start --port 3997)",
+      "Bash(curl -s -o /dev/null --max-time 60 http://localhost:3997/)",
+      "Bash(curl -s --max-time 60 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3997/)",
+      "Bash(curl -s --max-time 60 http://localhost:3997/)",
+      "Bash(DATABASE_URL=\"postgresql://u:p@db-inexistente.invalid/neondb?sslmode=require\" npx next start --port 3996)",
+      "Bash(curl -s -o /dev/null --max-time 60 http://localhost:3996/)",
+      "Bash(curl -s --max-time 60 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3996/)",
+      "Bash(curl -s --max-time 60 http://localhost:3996/)",
+      "Bash(taskkill //IM node.exe //F)",
+      "Bash(rm -rf .open-next)"
     ]
   }
 }

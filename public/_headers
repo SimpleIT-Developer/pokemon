@@ -1,2 +1,6 @@
 /_next/static/*
   Cache-Control: public,max-age=31536000,immutable
+
+# Must always be revalidated, or browsers pin an outdated worker.
+/sw.js
+  Cache-Control: public,max-age=0,must-revalidate

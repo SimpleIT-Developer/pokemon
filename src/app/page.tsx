@@ -24,36 +24,26 @@ export default async function DashboardPage() {
   // We assume a default user for MVP since auth isn't fully implemented
   const mockUserId = 'user-1'
   
-  let totalFound = 0
   const maxTotal = 1025
   const genStats: Record<number, number> = {}
-  
-  try {
-    // Try to get actual data from db
-    const userCollections = await db.select({
-      pokemonId: collections.pokemonId,
-      generation: pokemons.generation,
-    }).from(collections)
-      .innerJoin(pokemons, eq(collections.pokemonId, pokemons.id))
-      .where(and(eq(collections.userId, mockUserId), eq(collections.owned, true)))
-    
-    totalFound = userCollections.length
-    
-    // Group by generation
-    for (const g of GENERATIONS) {
-      genStats[g.gen] = 0
-    }
-    
-    for (const item of userCollections) {
-      if (item.generation) {
-        genStats[item.generation] = (genStats[item.generation] || 0) + 1
-      }
-    }
-  } catch (error) {
-    console.error("Database connection failed. Please ensure DATABASE_URL is set and DB is seeded.", error)
-    // Fallback zero stats
-    for (const g of GENERATIONS) {
-      genStats[g.gen] = 0
+
+  const userCollections = await db.select({
+    pokemonId: collections.pokemonId,
+    generation: pokemons.generation,
+  }).from(collections)
+    .innerJoin(pokemons, eq(collections.pokemonId, pokemons.id))
+    .where(and(eq(collections.userId, mockUserId), eq(collections.owned, true)))
+
+  const totalFound = userCollections.length
+
+  // Group by generation
+  for (const g of GENERATIONS) {
+    genStats[g.gen] = 0
+  }
+
+  for (const item of userCollections) {
+    if (item.generation) {
+      genStats[item.generation] = (genStats[item.generation] || 0) + 1
     }
   }
 

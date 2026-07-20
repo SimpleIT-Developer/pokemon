@@ -9,25 +9,20 @@ export const dynamic = 'force-dynamic'
 
 export default async function ColecaoPage() {
   const mockUserId = 'user-1'
-  let collectionsList: any[] = []
-  
-  try {
-    const rawData = await db.select()
-      .from(collections)
-      .innerJoin(pokemons, eq(collections.pokemonId, pokemons.id))
-      .where(and(
-        eq(collections.userId, mockUserId),
-        eq(collections.owned, true)
-      ))
-      .orderBy(asc(pokemons.pokedexNumber))
-      
-    collectionsList = rawData.map(row => ({
-      ...row.Collection,
-      pokemon: row.Pokemon
-    }))
-  } catch (error) {
-    console.error(error)
-  }
+
+  const rawData = await db.select()
+    .from(collections)
+    .innerJoin(pokemons, eq(collections.pokemonId, pokemons.id))
+    .where(and(
+      eq(collections.userId, mockUserId),
+      eq(collections.owned, true)
+    ))
+    .orderBy(asc(pokemons.pokedexNumber))
+
+  const collectionsList = rawData.map(row => ({
+    ...row.Collection,
+    pokemon: row.Pokemon
+  }))
 
   const uniquePokemons = collectionsList.length
   const totalCards = collectionsList.reduce((acc, curr) => acc + (curr.quantity || 1), 0)
