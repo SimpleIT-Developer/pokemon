@@ -30,7 +30,7 @@ export default async function GenerationPage(props: { params: Promise<{ generati
       select: { pokemonId: true }
     })
     
-    collections.forEach(c => ownedIds.add(c.pokemonId))
+    collections.forEach((c: { pokemonId: string }) => ownedIds.add(c.pokemonId))
   } catch (error) {
     console.error("Database connection failed", error)
   }
