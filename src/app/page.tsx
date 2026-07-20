@@ -5,6 +5,9 @@ import db from '@/db'
 import { collections, pokemons } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
 
+// Reads the user's collection, so it must not be prerendered at build time.
+export const dynamic = 'force-dynamic'
+
 const GENERATIONS = [
   { gen: 1, start: 1, end: 151 },
   { gen: 2, start: 152, end: 251 },

@@ -4,6 +4,9 @@ import db from '@/db'
 import { collections, pokemons } from '@/db/schema'
 import { eq, and, asc } from 'drizzle-orm'
 
+// Reads the user's collection, so it must not be prerendered at build time.
+export const dynamic = 'force-dynamic'
+
 export default async function ColecaoPage() {
   const mockUserId = 'user-1'
   let collectionsList: any[] = []
