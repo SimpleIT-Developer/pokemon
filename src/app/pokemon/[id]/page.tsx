@@ -2,7 +2,9 @@ import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import AppHeader from '@/components/AppHeader'
 import CollectionToggle from '@/components/CollectionToggle'
-import prisma from '@/lib/prisma'
+import db from '@/db'
+import { collections, pokemons } from '@/db/schema'
+import { eq, and } from 'drizzle-orm'
 
 export default async function PokemonPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -11,19 +13,18 @@ export default async function PokemonPage(props: { params: Promise<{ id: string 
   let collection: any = null
   
   try {
-    pokemon = await prisma.pokemon.findUnique({
-      where: { id: params.id }
-    })
-    
-    if (pokemon) {
-      collection = await prisma.collection.findUnique({
-        where: {
-          userId_pokemonId: {
-            userId: mockUserId,
-            pokemonId: pokemon.id,
-          }
-        }
-      })
+    const pResult = await db.select().from(pokemons).where(eq(pokemons.id, params.id)).limit(1)
+    if (pResult.length > 0) {
+      pokemon = pResult[0]
+      
+      const cResult = await db.select().from(collections).where(and(
+        eq(collections.userId, mockUserId),
+        eq(collections.pokemonId, pokemon.id)
+      )).limit(1)
+      
+      if (cResult.length > 0) {
+        collection = cResult[0]
+      }
     }
   } catch (error) {
     console.error(error)

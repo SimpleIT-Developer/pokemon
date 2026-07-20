@@ -1,6 +1,8 @@
 import AppHeader from '@/components/AppHeader'
 import PokemonCard from '@/components/PokemonCard'
-import prisma from '@/lib/prisma'
+import db from '@/db'
+import { collections, pokemons } from '@/db/schema'
+import { eq, and, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 
 export default async function GenerationPage(props: { params: Promise<{ generation: string }> }) {
@@ -12,31 +14,31 @@ export default async function GenerationPage(props: { params: Promise<{ generati
   }
 
   const mockUserId = 'user-1'
-  let pokemons: any[] = []
+  let pokemonsList: any[] = []
   let ownedIds = new Set<string>()
 
   try {
-    pokemons = await prisma.pokemon.findMany({
-      where: { generation: gen },
-      orderBy: { pokedexNumber: 'asc' }
-    })
+    pokemonsList = await db.select()
+      .from(pokemons)
+      .where(eq(pokemons.generation, gen))
+      .orderBy(asc(pokemons.pokedexNumber))
     
-    const collections = await prisma.collection.findMany({
-      where: { 
-        userId: mockUserId, 
-        owned: true,
-        pokemon: { generation: gen }
-      },
-      select: { pokemonId: true }
-    })
+    const userCollections = await db.select({ pokemonId: collections.pokemonId })
+      .from(collections)
+      .innerJoin(pokemons, eq(collections.pokemonId, pokemons.id))
+      .where(and(
+        eq(collections.userId, mockUserId),
+        eq(collections.owned, true),
+        eq(pokemons.generation, gen)
+      ))
     
-    collections.forEach((c: { pokemonId: string }) => ownedIds.add(c.pokemonId))
+    userCollections.forEach((c) => ownedIds.add(c.pokemonId))
   } catch (error) {
     console.error("Database connection failed", error)
   }
 
   const foundCount = ownedIds.size
-  const totalCount = pokemons.length
+  const totalCount = pokemonsList.length
 
   return (
     <>
@@ -47,13 +49,13 @@ export default async function GenerationPage(props: { params: Promise<{ generati
           <p className="text-gray-500 font-medium">{foundCount} / {totalCount} encontrados</p>
         </div>
         
-        {pokemons.length === 0 ? (
+        {pokemonsList.length === 0 ? (
           <div className="text-center py-10 bg-white dark:bg-poke-dark rounded-xl border border-poke-gray dark:border-gray-700">
             <p className="text-gray-500">Nenhum Pokémon encontrado. Execute o seed.</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {pokemons.map(p => (
+            {pokemonsList.map((p: any) => (
               <PokemonCard 
                 key={p.id}
                 id={p.id}

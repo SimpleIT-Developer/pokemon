@@ -1,6 +1,8 @@
 'use server'
 
-import prisma from '@/lib/prisma'
+import db from '@/db'
+import { collections } from '@/db/schema'
+import { eq, and } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 
 const mockUserId = 'user-1'
@@ -8,31 +10,19 @@ const mockUserId = 'user-1'
 export async function togglePokemonInCollection(pokemonId: string, currentlyOwned: boolean) {
   try {
     if (currentlyOwned) {
-      await prisma.collection.delete({
-        where: {
-          userId_pokemonId: {
-            userId: mockUserId,
-            pokemonId,
-          }
-        }
-      })
+      await db.delete(collections).where(and(
+        eq(collections.userId, mockUserId),
+        eq(collections.pokemonId, pokemonId)
+      ))
     } else {
-      await prisma.collection.upsert({
-        where: {
-          userId_pokemonId: {
-            userId: mockUserId,
-            pokemonId,
-          }
-        },
-        update: {
-          owned: true,
-        },
-        create: {
-          userId: mockUserId,
-          pokemonId,
-          owned: true,
-          quantity: 1,
-        }
+      await db.insert(collections).values({
+        userId: mockUserId,
+        pokemonId,
+        owned: true,
+        quantity: 1,
+      }).onConflictDoUpdate({
+        target: [collections.userId, collections.pokemonId],
+        set: { owned: true }
       })
     }
     
@@ -56,15 +46,10 @@ export async function updatePokemonQuantity(pokemonId: string, quantity: number)
       return { success: true }
     }
     
-    await prisma.collection.update({
-      where: {
-        userId_pokemonId: {
-          userId: mockUserId,
-          pokemonId,
-        }
-      },
-      data: { quantity }
-    })
+    await db.update(collections).set({ quantity }).where(and(
+      eq(collections.userId, mockUserId),
+      eq(collections.pokemonId, pokemonId)
+    ))
     
     revalidatePath('/pokemon/[id]', 'page')
     revalidatePath('/colecao', 'page')

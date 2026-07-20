@@ -1,7 +1,9 @@
 import AppHeader from '@/components/AppHeader'
 import ProgressBar from '@/components/ProgressBar'
 import GenerationCard from '@/components/GenerationCard'
-import prisma from '@/lib/prisma'
+import db from '@/db'
+import { collections, pokemons } from '@/db/schema'
+import { eq, and } from 'drizzle-orm'
 
 const GENERATIONS = [
   { gen: 1, start: 1, end: 151 },
@@ -25,21 +27,23 @@ export default async function DashboardPage() {
   
   try {
     // Try to get actual data from db
-    const collections = await prisma.collection.findMany({
-      where: { userId: mockUserId, owned: true },
-      include: { pokemon: true }
-    })
+    const userCollections = await db.select({
+      pokemonId: collections.pokemonId,
+      generation: pokemons.generation,
+    }).from(collections)
+      .innerJoin(pokemons, eq(collections.pokemonId, pokemons.id))
+      .where(and(eq(collections.userId, mockUserId), eq(collections.owned, true)))
     
-    totalFound = collections.length
+    totalFound = userCollections.length
     
     // Group by generation
     for (const g of GENERATIONS) {
       genStats[g.gen] = 0
     }
     
-    for (const item of collections) {
-      if (item.pokemon && item.pokemon.generation) {
-        genStats[item.pokemon.generation] = (genStats[item.pokemon.generation] || 0) + 1
+    for (const item of userCollections) {
+      if (item.generation) {
+        genStats[item.generation] = (genStats[item.generation] || 0) + 1
       }
     }
   } catch (error) {

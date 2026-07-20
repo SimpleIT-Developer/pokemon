@@ -1,102 +1,59 @@
-import { PrismaClient } from '@prisma/client'
+import { pokemons } from '../db/schema'
+import db from '../db'
+import { eq } from 'drizzle-orm'
 
-const prisma = new PrismaClient()
+async function fetchPokemonData(id: number) {
+  const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`)
+  if (!response.ok) throw new Error(`Failed to fetch pokemon ${id}`)
+  const data = await response.json()
+  
+  const speciesResponse = await fetch(data.species.url)
+  const speciesData = await speciesResponse.json()
+  
+  const generationUrl = speciesData.generation.url
+  const genNumber = parseInt(generationUrl.split('/').filter(Boolean).pop() || '1')
 
-const GENERATIONS = [
-  { gen: 1, start: 1, end: 151 },
-  { gen: 2, start: 152, end: 251 },
-  { gen: 3, start: 252, end: 386 },
-  { gen: 4, start: 387, end: 493 },
-  { gen: 5, start: 494, end: 649 },
-  { gen: 6, start: 650, end: 721 },
-  { gen: 7, start: 722, end: 809 },
-  { gen: 8, start: 810, end: 905 },
-  { gen: 9, start: 906, end: 1025 },
-]
-
-function getGeneration(id: number) {
-  for (const g of GENERATIONS) {
-    if (id >= g.start && id <= g.end) return g.gen
+  return {
+    pokedexNumber: data.id,
+    name: data.name,
+    generation: genNumber,
+    primaryType: data.types[0].type.name,
+    secondaryType: data.types[1]?.type.name || null,
+    imageUrl: data.sprites.other['official-artwork'].front_default || data.sprites.front_default,
   }
-  return 1
 }
 
-function capitalize(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
-}
-
-async function syncPokemon() {
-  console.log('Starting Pokémon sync from PokeAPI...')
+async function main() {
+  console.log('Starting Pokemon sync (1 to 1025)...')
   
-  // To avoid hitting the API too hard, we'll process in chunks or sequentially
-  const maxId = 1025
-  
-  for (let id = 1; id <= maxId; id++) {
+  for (let i = 1; i <= 1025; i++) {
     try {
-      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`)
-      if (!res.ok) {
-        console.error(`Failed to fetch Pokemon #${id}`)
-        continue
-      }
+      console.log(`Fetching #${i}...`)
+      const data = await fetchPokemonData(i)
       
-      const data = await res.json()
-      const primaryType = data.types.find((t: any) => t.slot === 1)?.type.name || 'normal'
-      const secondaryType = data.types.find((t: any) => t.slot === 2)?.type.name || null
-      
-      // The official artwork is typically here:
-      const imageUrl = data.sprites?.other?.['official-artwork']?.front_default 
-        || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`
-        
-      const spriteUrl = data.sprites?.front_default 
-        || `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
-      
-      const name = capitalize(data.name)
-      const slug = data.name
-      const pokedexNumber = id
-      const generation = getGeneration(id)
-      
-      await prisma.pokemon.upsert({
-        where: { pokedexNumber },
-        update: {
-          name,
-          slug,
-          generation,
-          primaryType,
-          secondaryType,
-          imageUrl,
-          spriteUrl,
-        },
-        create: {
-          pokedexNumber,
-          name,
-          slug,
-          generation,
-          primaryType,
-          secondaryType,
-          imageUrl,
-          spriteUrl,
-        }
+      await db.insert(pokemons).values({
+        pokedexNumber: data.pokedexNumber,
+        name: data.name,
+        generation: data.generation,
+        primaryType: data.primaryType,
+        secondaryType: data.secondaryType,
+        imageUrl: data.imageUrl,
+      }).onConflictDoUpdate({
+        target: pokemons.pokedexNumber,
+        set: data
       })
       
-      if (id % 50 === 0) {
-        console.log(`Synced up to #${id}`)
-      }
-    } catch (err) {
-      console.error(`Error syncing #${id}:`, err)
+      console.log(`Saved #${i} ${data.name}`)
+    } catch (error) {
+      console.error(`Error on pokemon ${i}:`, error)
     }
-    
-    // Slight delay to be polite to PokeAPI
-    await new Promise(resolve => setTimeout(resolve, 50))
   }
   
-  console.log('Pokémon sync completed!')
+  console.log('Sync completed!')
+  process.exit(0)
 }
 
-syncPokemon()
-  .catch(e => {
-    console.error(e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+main().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

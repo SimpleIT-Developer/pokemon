@@ -1,32 +1,33 @@
 import AppHeader from '@/components/AppHeader'
 import PokemonCard from '@/components/PokemonCard'
-import prisma from '@/lib/prisma'
+import db from '@/db'
+import { collections, pokemons } from '@/db/schema'
+import { eq, and, asc } from 'drizzle-orm'
 
 export default async function ColecaoPage() {
   const mockUserId = 'user-1'
-  let collections: any[] = []
+  let collectionsList: any[] = []
   
   try {
-    collections = await prisma.collection.findMany({
-      where: { 
-        userId: mockUserId,
-        owned: true 
-      },
-      include: {
-        pokemon: true
-      },
-      orderBy: {
-        pokemon: {
-          pokedexNumber: 'asc'
-        }
-      }
-    })
+    const rawData = await db.select()
+      .from(collections)
+      .innerJoin(pokemons, eq(collections.pokemonId, pokemons.id))
+      .where(and(
+        eq(collections.userId, mockUserId),
+        eq(collections.owned, true)
+      ))
+      .orderBy(asc(pokemons.pokedexNumber))
+      
+    collectionsList = rawData.map(row => ({
+      ...row.Collection,
+      pokemon: row.Pokemon
+    }))
   } catch (error) {
     console.error(error)
   }
 
-  const uniquePokemons = collections.length
-  const totalCards = collections.reduce((acc, curr) => acc + (curr.quantity || 1), 0)
+  const uniquePokemons = collectionsList.length
+  const totalCards = collectionsList.reduce((acc, curr) => acc + (curr.quantity || 1), 0)
 
   return (
     <>
@@ -52,7 +53,7 @@ export default async function ColecaoPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {collections.map(c => (
+            {collectionsList.map(c => (
               <PokemonCard 
                 key={c.pokemon.id}
                 id={c.pokemon.id}
