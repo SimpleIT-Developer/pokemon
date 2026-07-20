@@ -1,0 +1,16 @@
+{
+  "name": "Minha Pokédex",
+  "short_name": "Pokédex",
+  "description": "Aplicativo para gerenciar coleção de cartas Pokémon",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ef4444",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "16x16 32x32 48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}
