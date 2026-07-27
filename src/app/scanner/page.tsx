@@ -25,6 +25,7 @@ import {
   type CardOption,
 } from '@/app/actions/scan'
 import { togglePokemonInCollection } from '@/app/actions/collection'
+import LiveScanner from '@/components/LiveScanner'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import clsx from 'clsx'
@@ -39,6 +40,7 @@ interface Debug {
 
 export default function ScannerPage() {
   const [image, setImage] = useState<string | null>(null)
+  const [liveMode, setLiveMode] = useState(false)
   const [manualMode, setManualMode] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
   const [result, setResult] = useState<IdentifyResult | null>(null)
@@ -168,6 +170,19 @@ export default function ScannerPage() {
     <>
       <AppHeader title="Scanner de Cartas" />
 
+      {liveMode && (
+        <LiveScanner
+          added={added}
+          isPending={isPending}
+          onQuickAdd={quickAdd}
+          onClose={() => setLiveMode(false)}
+          onPick={(p) => {
+            setLiveMode(false)
+            pickPokemon(p)
+          }}
+        />
+      )}
+
       <div className="p-4 max-w-md mx-auto pb-24">
         {actionError && (
           <div className="mb-4 flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 rounded-xl p-3 text-sm font-medium">
@@ -196,7 +211,8 @@ export default function ScannerPage() {
         ) : !image ? (
           <div className="flex flex-col gap-4">
             <CaptureArea
-              onPick={() => fileInputRef.current?.click()}
+              onLive={() => setLiveMode(true)}
+              onGallery={() => fileInputRef.current?.click()}
               onManual={() => {
                 setSearchResults(null)
                 setManualMode((v) => !v)
@@ -300,11 +316,13 @@ export default function ScannerPage() {
 }
 
 function CaptureArea({
-  onPick,
+  onLive,
+  onGallery,
   onManual,
   manualOpen,
 }: {
-  onPick: () => void
+  onLive: () => void
+  onGallery: () => void
   onManual: () => void
   manualOpen: boolean
 }) {
@@ -313,27 +331,25 @@ function CaptureArea({
       <div className="absolute inset-8 border-2 border-poke-blue/30 rounded-xl pointer-events-none" />
       <Camera className="w-16 h-16 text-gray-400 mb-4" />
       <p className="text-gray-500 font-medium text-center px-8 mb-6">
-        Enquadre só a carta, com boa luz e o nome no topo bem legível.
+        Aponte a câmera para a carta — ele identifica ao vivo, com o nome reto e bem iluminado.
       </p>
-      <div className="flex gap-4">
-        <button
-          onClick={onPick}
-          className="flex items-center gap-2 bg-poke-red text-white px-6 py-3 rounded-full font-bold shadow-md hover:bg-poke-red-dark active:scale-95 transition-all"
-        >
-          <Camera className="w-5 h-5" />
-          Câmera
-        </button>
-        <button
-          onClick={onPick}
-          className="flex items-center gap-2 bg-white dark:bg-poke-dark text-poke-dark dark:text-white border border-gray-200 dark:border-gray-700 px-6 py-3 rounded-full font-bold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 transition-all"
-        >
-          <Upload className="w-5 h-5" />
-          Galeria
-        </button>
-      </div>
+      <button
+        onClick={onLive}
+        className="flex items-center gap-2 bg-poke-red text-white px-8 py-3 rounded-full font-bold shadow-md hover:bg-poke-red-dark active:scale-95 transition-all"
+      >
+        <Camera className="w-5 h-5" />
+        Escanear ao vivo
+      </button>
+      <button
+        onClick={onGallery}
+        className="mt-3 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 font-bold"
+      >
+        <Upload className="w-4 h-4" />
+        Enviar da galeria
+      </button>
       <button
         onClick={onManual}
-        className="mt-6 flex items-center gap-1 text-sm text-poke-blue font-bold underline underline-offset-2"
+        className="mt-4 flex items-center gap-1 text-sm text-poke-blue font-bold underline underline-offset-2"
       >
         <Search className="w-4 h-4" />
         {manualOpen ? 'Fechar busca manual' : 'Adicionar pelo número ou nome'}

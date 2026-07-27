@@ -27,6 +27,15 @@ export default async function ColecaoPage() {
   const uniquePokemons = collectionsList.length
   const totalCards = collectionsList.reduce((acc, curr) => acc + (curr.quantity || 1), 0)
 
+  // Group by generation, keeping the pokedexNumber order within each group.
+  const byGeneration = new Map<number, typeof collectionsList>()
+  for (const c of collectionsList) {
+    const gen = c.pokemon.generation
+    if (!byGeneration.has(gen)) byGeneration.set(gen, [])
+    byGeneration.get(gen)!.push(c)
+  }
+  const generations = [...byGeneration.entries()].sort((a, b) => a[0] - b[0])
+
   return (
     <>
       <AppHeader title="Minha Coleção" backTo="/" />
@@ -50,16 +59,28 @@ export default async function ColecaoPage() {
             <p className="text-sm text-gray-400">Use o Scanner ou adicione manualmente.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {collectionsList.map(c => (
-              <PokemonCard 
-                key={c.pokemon.id}
-                id={c.pokemon.id}
-                pokedexNumber={c.pokemon.pokedexNumber}
-                name={c.pokemon.name}
-                imageUrl={c.pokemon.imageUrl}
-                owned={true}
-              />
+          <div className="space-y-6">
+            {generations.map(([gen, items]) => (
+              <section key={gen}>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-black text-lg text-poke-dark dark:text-white">
+                    {gen}ª Geração
+                  </h2>
+                  <span className="text-sm font-medium text-gray-500">{items.length}</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {items.map((c) => (
+                    <PokemonCard
+                      key={c.pokemon.id}
+                      id={c.pokemon.id}
+                      pokedexNumber={c.pokemon.pokedexNumber}
+                      name={c.pokemon.name}
+                      imageUrl={c.pokemon.imageUrl}
+                      owned={true}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}

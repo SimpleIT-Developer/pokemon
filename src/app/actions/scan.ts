@@ -300,6 +300,16 @@ async function fetchSpeciesFromPokeApi(n: number) {
   }
 }
 
+/** Full Pokédex with ownership, loaded once so live scanning can fuzzy-match
+ *  frames on the client without a server round trip per frame. */
+export async function getPokedex(): Promise<IdentifiedPokemon[]> {
+  const all = await db
+    .select(POKEMON_COLUMNS)
+    .from(pokemons)
+    .orderBy(asc(pokemons.pokedexNumber))
+  return withOwnership(all)
+}
+
 /** Manual fallback search for the scanner's text box. */
 export async function searchPokemon(query: string): Promise<IdentifiedPokemon[]> {
   const q = query.trim()
