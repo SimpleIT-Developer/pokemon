@@ -61,7 +61,14 @@
       "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}  type:%{content_type}\\\\n' --max-time 20 https://pokemon.simpleit.app.br/sw.js)",
       "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}  type:%{content_type}\\\\n' --max-time 20 https://pokemon.simpleit.app.br/icon-192.png)",
       "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' --max-time 20 https://pokemon.simpleit.app.br/icon-512.png)",
-      "Bash(curl -s --max-time 20 https://pokemon.simpleit.app.br/manifest.json)"
+      "Bash(curl -s --max-time 20 https://pokemon.simpleit.app.br/manifest.json)",
+      "Bash(curl -s -o /dev/null --max-time 3 \"http://localhost:8799/\")",
+      "Bash(curl -s --max-time 40 \"http://localhost:8799/\")",
+      "Bash(curl -s -o /dev/null --max-time 3 \"http://localhost:8798/?n=25\")",
+      "Bash(curl -s --max-time 40 \"http://localhost:8798/?n=25\")",
+      "Bash(curl -s --max-time 40 \"http://localhost:8798/?n=1\")",
+      "Bash(curl -s -w '\\\\nHTTP:%{http_code} SIZE:%{size_download} TIME:%{time_total}s\\\\n' --max-time 40 'https://api.pokemontcg.io/v2/cards?q=nationalPokedexNumbers%3A25&pageSize=60&select=id,name,number,rarity,set,images')",
+      "Bash(curl -s -w \"\\\\nHTTP:%{http_code} SIZE:%{size_download} TIME:%{time_total}s\\\\n\" --max-time 40 \"https://api.pokemontcg.io/v2/cards?q=nationalPokedexNumbers:25&pageSize=60&select=id,name,number,rarity,set,images\")"
     ]
   }
 }

@@ -1,5 +1,5 @@
 import AppHeader from '@/components/AppHeader'
-import PokemonCard from '@/components/PokemonCard'
+import GenerationGrid from '@/components/GenerationGrid'
 import db from '@/db'
 import { collections, pokemons } from '@/db/schema'
 import { eq, and, asc } from 'drizzle-orm'
@@ -34,32 +34,29 @@ export default async function GenerationPage(props: { params: Promise<{ generati
   const foundCount = ownedIds.size
   const totalCount = pokemonsList.length
 
+  const items = pokemonsList.map((p) => ({
+    id: p.id,
+    pokedexNumber: p.pokedexNumber,
+    name: p.name,
+    imageUrl: p.imageUrl,
+    owned: ownedIds.has(p.id),
+  }))
+
   return (
     <>
       <AppHeader title={`${gen}ª Geração`} backTo="/" />
-      
+
       <div className="p-4 max-w-md mx-auto">
         <div className="mb-4 text-center">
           <p className="text-gray-500 font-medium">{foundCount} / {totalCount} encontrados</p>
         </div>
-        
-        {pokemonsList.length === 0 ? (
+
+        {totalCount === 0 ? (
           <div className="text-center py-10 bg-white dark:bg-poke-dark rounded-xl border border-poke-gray dark:border-gray-700">
             <p className="text-gray-500">Nenhum Pokémon encontrado. Execute o seed.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {pokemonsList.map((p: any) => (
-              <PokemonCard 
-                key={p.id}
-                id={p.id}
-                pokedexNumber={p.pokedexNumber}
-                name={p.name}
-                imageUrl={p.imageUrl}
-                owned={ownedIds.has(p.id)}
-              />
-            ))}
-          </div>
+          <GenerationGrid items={items} />
         )}
       </div>
     </>

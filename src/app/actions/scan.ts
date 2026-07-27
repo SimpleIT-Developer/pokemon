@@ -65,12 +65,37 @@ async function fetchWithTimeout(
   }
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * GET a pokemontcg.io endpoint with retries. The API is flaky under load —
+ * heavier queries intermittently return a fast 500 (or an empty body) and
+ * succeed on a later try — so we retry with backoff. Returns parsed JSON, or
+ * null if every attempt failed.
+ */
+async function tcgGet(url: string, attempts = 5): Promise<{ data?: any[] } | null> {
+  const key = process.env.POKEMON_TCG_API_KEY
+  const headers: Record<string, string> = key ? { 'X-Api-Key': key } : {}
+
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetchWithTimeout(url, { headers }, 12000)
+      if (res.ok) {
+        const text = await res.text()
+        if (text) return JSON.parse(text) as { data?: any[] }
+      }
+    } catch {
+      // network/timeout — retry
+    }
+    if (i < attempts - 1) await sleep(300 * (i + 1))
+  }
+  return null
+}
+
 async function fetchCard(
   pokedexNumber: number,
   collectorNumber: string | null,
 ): Promise<IdentifiedCard | null> {
-  const key = process.env.POKEMON_TCG_API_KEY
-  const headers: Record<string, string> = key ? { 'X-Api-Key': key } : {}
   const select = 'id,name,number,rarity,set,images,nationalPokedexNumbers'
 
   const queries = collectorNumber
@@ -81,24 +106,17 @@ async function fetchCard(
     : [`nationalPokedexNumbers:${pokedexNumber}`]
 
   for (const q of queries) {
-    try {
-      const url = `${TCG_ENDPOINT}?q=${encodeURIComponent(q)}&pageSize=1&select=${select}`
-      const res = await fetchWithTimeout(url, { headers }, 8000)
-      if (!res.ok) continue
+    const url = `${TCG_ENDPOINT}?q=${encodeURIComponent(q)}&pageSize=1&select=${select}`
+    const json = await tcgGet(url, 3)
+    const card = json?.data?.[0]
+    if (!card) continue
 
-      const json = (await res.json()) as { data?: any[] }
-      const card = json.data?.[0]
-      if (!card) continue
-
-      return {
-        name: card.name ?? '',
-        setName: card.set?.name ?? '',
-        number: card.number ?? '',
-        rarity: card.rarity ?? null,
-        image: card.images?.small ?? card.images?.large ?? null,
-      }
-    } catch {
-      // Network/timeout: fall through so identification still succeeds.
+    return {
+      name: card.name ?? '',
+      setName: card.set?.name ?? '',
+      number: card.number ?? '',
+      rarity: card.rarity ?? null,
+      image: card.images?.small ?? card.images?.large ?? null,
     }
   }
   return null
@@ -112,34 +130,30 @@ async function fetchCard(
 export async function getCardsForPokemon(pokedexNumber: number): Promise<CardOption[]> {
   if (!Number.isInteger(pokedexNumber) || pokedexNumber < 1) return []
 
-  const key = process.env.POKEMON_TCG_API_KEY
-  const headers: Record<string, string> = key ? { 'X-Api-Key': key } : {}
   const select = 'id,name,number,rarity,set,images'
   const q = `nationalPokedexNumbers:${pokedexNumber}`
-  // No server-side orderBy: sorting by set.releaseDate on the API is ~10x slower
-  // (30s+) and blows the timeout. Fetch unsorted, order newest-first in JS.
-  const url = `${TCG_ENDPOINT}?q=${encodeURIComponent(q)}&pageSize=60&select=${select}`
+  // pageSize is deliberately small: the API returns a fast 500 on heavier
+  // queries, and success rate rises sharply as the page shrinks. No server-side
+  // orderBy (it's ~10x slower) — we sort newest-first in JS. tcgGet retries the
+  // intermittent failures.
+  const url = `${TCG_ENDPOINT}?q=${encodeURIComponent(q)}&pageSize=20&select=${select}`
 
-  try {
-    const res = await fetchWithTimeout(url, { headers }, 12000)
-    if (!res.ok) return []
-    const json = (await res.json()) as { data?: any[] }
-    const cards: CardOption[] = (json.data ?? []).map((card) => ({
-      id: card.id,
-      name: card.name ?? '',
-      setName: card.set?.name ?? '',
-      number: card.number ?? '',
-      rarity: card.rarity ?? null,
-      releaseDate: card.set?.releaseDate ?? null,
-      image: card.images?.small ?? card.images?.large ?? null,
-    }))
+  const json = await tcgGet(url, 5)
+  if (!json) return []
 
-    // releaseDate is "YYYY/MM/DD", so a string compare sorts chronologically.
-    cards.sort((a, b) => (b.releaseDate ?? '').localeCompare(a.releaseDate ?? ''))
-    return cards
-  } catch {
-    return []
-  }
+  const cards: CardOption[] = (json.data ?? []).map((card) => ({
+    id: card.id,
+    name: card.name ?? '',
+    setName: card.set?.name ?? '',
+    number: card.number ?? '',
+    rarity: card.rarity ?? null,
+    releaseDate: card.set?.releaseDate ?? null,
+    image: card.images?.small ?? card.images?.large ?? null,
+  }))
+
+  // releaseDate is "YYYY/MM/DD", so a string compare sorts chronologically.
+  cards.sort((a, b) => (b.releaseDate ?? '').localeCompare(a.releaseDate ?? ''))
+  return cards
 }
 
 /**
